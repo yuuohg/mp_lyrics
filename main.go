@@ -14,6 +14,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/panjf2000/ants/v2"
@@ -145,6 +146,7 @@ func (query *Query) fetchSearchResults() ([]byte, error) {
 	if err != nil {
 		return []byte{}, AddError(err)
 	}
+	defer resp.Body.Close()
 	var leng = 1024
 	if resp.ContentLength >= 0 {
 		leng = int(resp.ContentLength)
@@ -351,6 +353,7 @@ func main() {
 		fmt.Printf("Couldn't initialize a pool: \n%v\n", err.Error())
 		os.Exit(1)
 	}
+	wg := sync.WaitGroup{}
 	var dirExistNot = true
 	for {
 		s, err := r.Read()
@@ -373,9 +376,9 @@ func main() {
 			}
 			dirExistNot = false
 		}
-		pool.Submit(func() { song.GetLyricsForSong(dirName) })
+		pool.Submit(func() { song.GetLyricsForSong(dirName); wg.Done() })
+		wg.Add(1)
 	}
-	for pool.Running() > 1 {
-		time.Sleep(time.Second * 15)
-	}
+	wg.Wait()
+	pool.Release()
 }
